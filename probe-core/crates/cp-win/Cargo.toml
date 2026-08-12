@@ -1,0 +1,55 @@
+[package]
+name = "cp-win"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Windows probe implementations. The only crate in the workspace that touches an OS API."
+
+[[bin]]
+name = "probe-once"
+path = "src/bin/probe_once.rs"
+
+[[bin]]
+name = "probe-serve"
+path = "src/bin/probe_serve.rs"
+
+[dependencies]
+cp-signals = { path = "../cp-signals" }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+hmac = "0.12"
+sha2 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Storage_FileSystem",
+    "Win32_Security_WinTrust",
+    "Win32_Security_Cryptography",
+    "Win32_Security_Cryptography_Catalog",
+    "Win32_Security_Cryptography_Sip",
+    "Win32_System_IO",
+] }
+
+# The typed/generated bindings, used for the COM surface only.
+#
+# S3 walks five COM interfaces, and COM dispatches by vtable SLOT INDEX rather than by name — a
+# miscounted declaration calls the wrong function instead of failing to build. These interfaces are
+# generated from Microsoft's own Win32 metadata, which removes that entire class of bug. That is
+# worth the heavier dependency for exactly this module; the non-COM probes stay on windows-sys.
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_Devices_FunctionDiscovery",
+] }

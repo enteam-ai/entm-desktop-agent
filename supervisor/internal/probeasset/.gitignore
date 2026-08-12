@@ -1,0 +1,2 @@
+# Build input, copied here from probe-core/target/release by the release build.
+probe-serve.exe

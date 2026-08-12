@@ -1,0 +1,16 @@
+[package]
+name = "cp-signals"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Signal envelope v1 and coverage report v1 types. No OS calls — see schemas/README.md."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
