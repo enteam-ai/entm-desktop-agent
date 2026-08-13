@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// SignatureInfo is what the verification actually measured — not asserted from configuration. See
+// SignatureInfo is what the verification actually measured â€” not asserted from configuration. See
 // [verifyAuthenticode].
 type SignatureInfo struct {
 	Valid  bool
@@ -17,22 +17,32 @@ type SignatureInfo struct {
 }
 
 // verifyAuthenticode checks a file's Authenticode signature via PowerShell's
-// Get-AuthenticodeSignature — the same official check behind Windows Explorer's own Digital
+// Get-AuthenticodeSignature â€” the same official check behind Windows Explorer's own Digital
 // Signatures tab, and one that already correctly handles catalog-signed binaries.
 //
 // This shells out rather than hand-rolling WinTrust bindings in Go, on purpose. `cp-win` already
 // has one hand-verified WinVerifyTrust implementation (Rust, generated bindings, measured against
-// a real machine, two defects found and fixed along the way — see progress.md). A second,
+// a real machine, two defects found and fixed along the way â€” see progress.md). A second,
 // hand-written one in Go, using raw syscalls with manually-laid-out structs and no equivalent
 // generated-binding safety net, is exactly the kind of code that can silently always report
-// "valid" from a struct-offset bug — which is worse than having no check at all. Shelling out to
+// "valid" from a struct-offset bug â€” which is worse than having no check at all. Shelling out to
 // Microsoft's own, already-correct implementation is the lower-risk choice here.
+//
+// The PSModulePath line is load-bearing, not tidying. Get-AuthenticodeSignature lives in the
+// autoloaded module Microsoft.PowerShell.Security, and autoload searches PSModulePath in order. A
+// machine with PowerShell 7 installed puts its module directory on that path, and those modules
+// declare CompatiblePSEditions = 'Core', which Windows PowerShell 5.1 finds but refuses to load â€”
+// failing with "the module could not be loaded", not with "command not found". Observed on
+// windows-latest in CI and reproduced locally by planting a Core-only manifest ahead of the real
+// one. Pinning the search path to this interpreter's own $PSHOME\Modules makes the resolution
+// deterministic, and it is scoped to the child process, so nothing else on the machine is affected.
 func verifyAuthenticode(path string) (SignatureInfo, error) {
 	// Single-quoted PowerShell string: escape ' as '' rather than passing path via $args, which
 	// behaves inconsistently across PowerShell -Command invocations depending on version.
 	escaped := strings.ReplaceAll(path, "'", "''")
 	script := fmt.Sprintf(`
 $ErrorActionPreference = "Stop"
+$env:PSModulePath = Join-Path $PSHOME 'Modules'
 $sig = Get-AuthenticodeSignature -LiteralPath '%s'
 $signer = $null
 if ($sig.SignerCertificate) { $signer = $sig.SignerCertificate.Subject }
@@ -73,9 +83,9 @@ if ($sig.SignerCertificate) { $signer = $sig.SignerCertificate.Subject }
 // verifyBeforeSpawn is the gate Start calls before it ever spawns the probe.
 //
 // `expectedPublisher` is a substring match against the certificate subject (e.g. `O=Contoso Corp`),
-// not an exact-string comparison — a subject contains CN/O/L/S/C fields in a fixed order, and
+// not an exact-string comparison â€” a subject contains CN/O/L/S/C fields in a fixed order, and
 // matching on the organisation field alone survives a CN change (product rename) without a code
-// change. Empty means unarmed: the probe is not yet signed (no EV certificate has been ordered —
+// change. Empty means unarmed: the probe is not yet signed (no EV certificate has been ordered â€”
 // see progress.md's "non-engineering, already blocking" section), so this call MUST NOT block
 // startup today, but it still runs and logs what it finds, so the gap is measured, not assumed.
 func verifyBeforeSpawn(exePath, expectedPublisher string) error {
@@ -94,7 +104,7 @@ func verifyBeforeSpawn(exePath, expectedPublisher string) error {
 	}
 
 	if !info.Valid {
-		return fmt.Errorf("probe signature is not valid (status: %s) — refusing to spawn an unverified binary", info.Status)
+		return fmt.Errorf("probe signature is not valid (status: %s) â€” refusing to spawn an unverified binary", info.Status)
 	}
 	if !strings.Contains(info.Signer, expectedPublisher) {
 		return fmt.Errorf("probe signer %q does not match expected publisher %q", info.Signer, expectedPublisher)
