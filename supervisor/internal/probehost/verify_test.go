@@ -3,6 +3,7 @@ package probehost
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -68,8 +69,17 @@ func TestVerifyBeforeSpawnRefusesAMismatchedPublisher(t *testing.T) {
 		t.Skipf("notepad.exe not found at %s", path)
 	}
 
-	if err := verifyBeforeSpawn(path, "O=Some Publisher That Is Not Microsoft"); err == nil {
-		t.Error("expected an error when the signer does not match the expected publisher")
+	// Asserting only "some error came back" is not enough, and this test proved it: on a machine
+	// where verifyAuthenticode itself fails, verifyBeforeSpawn returns "could not verify probe
+	// signature", which is an error, so the weaker assertion went green while the mechanism under
+	// test was entirely broken. A refusal test has to name the refusal it expects, or it cannot
+	// fail for its own subject.
+	err := verifyBeforeSpawn(path, "O=Some Publisher That Is Not Microsoft")
+	if err == nil {
+		t.Fatal("expected an error when the signer does not match the expected publisher")
+	}
+	if !strings.Contains(err.Error(), "does not match expected publisher") {
+		t.Fatalf("expected a publisher-mismatch refusal, got a different failure: %v", err)
 	}
 }
 

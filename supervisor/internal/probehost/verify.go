@@ -2,6 +2,7 @@ package probehost
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -41,6 +42,16 @@ if ($sig.SignerCertificate) { $signer = $sig.SignerCertificate.Subject }
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
 	out, err := cmd.Output()
 	if err != nil {
+		// PowerShell explains itself on stderr, and Output() has already captured it into
+		// ExitError.Stderr. Wrapping only the ExitError throws that away and leaves "exit status 1",
+		// which says nothing about whether the file was unreadable, the cmdlet was unavailable, or
+		// the script itself was wrong. This check runs on a candidate's machine where nobody can
+		// reproduce it interactively, so the one chance to learn why is to carry the reason with it.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return SignatureInfo{}, fmt.Errorf("Get-AuthenticodeSignature: %w: %s",
+				err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return SignatureInfo{}, fmt.Errorf("Get-AuthenticodeSignature: %w", err)
 	}
 
