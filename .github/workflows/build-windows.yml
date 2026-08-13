@@ -1,0 +1,160 @@
+# Builds the one file a candidate downloads.
+#
+# The agent is two languages -- Rust probes (probe-core) and a Go supervisor (supervisor) -- but it
+# ships as a single cp-agent.exe with the probe embedded inside it (see
+# supervisor/internal/probeasset). The order below matters: the probe must exist before the agent
+# that carries it is compiled, because //go:embed resolves at compile time. That is deliberate --
+# forgetting to build the probe breaks this workflow loudly instead of shipping an agent that
+# discovers it has nothing to spawn while a candidate is watching.
+
+name: Build Windows agent
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test on Windows
+    runs-on: windows-latest
+    permissions:
+      # Only the tagged-release step at the bottom uses this.
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache the cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: probe-core
+
+      - name: Install Go
+        # Read the version from go.mod rather than pinning it twice and letting them drift.
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: supervisor/go.mod
+          cache-dependency-path: supervisor/go.sum
+
+      # ---- tests, before anything that produces a shippable artifact ------------------------------
+
+      - name: Build the probes (debug)
+        # Built before the Go tests on purpose. crash_recovery_test.go looks for
+        # probe-core/target/debug/probe-serve.exe and SKIPS when it is absent -- so without this
+        # step the one test that exercises probe crash recovery against the real binary would
+        # quietly not run, and the suite would still report green.
+        working-directory: probe-core
+        run: cargo build -p cp-win --bins
+
+      - name: Rust tests
+        # Includes deny_capture_apis, which fails the build if any audio-capture entry point appears
+        # in cp-win. Enumerating audio sessions does not prompt the candidate for microphone access;
+        # opening a capture stream does.
+        working-directory: probe-core
+        run: cargo test --workspace
+
+      - name: Go tests
+        working-directory: supervisor
+        run: go test ./...
+
+      # ---- the shippable build --------------------------------------------------------------------
+
+      - name: Build the probes (release)
+        working-directory: probe-core
+        run: cargo build --release -p cp-win --bins
+
+      - name: Stage the probe for embedding
+        shell: pwsh
+        run: |
+          $src = 'probe-core/target/release/probe-serve.exe'
+          $dst = 'supervisor/internal/probeasset/probe-serve.exe'
+          Copy-Item $src $dst -Force
+          $size = (Get-Item $dst).Length
+          # A truncated or empty copy still embeds cleanly and fails much later, on the candidate's
+          # machine. Cheap to rule out here.
+          if ($size -lt 100kb) { throw "staged probe is only $size bytes - the release build did not produce a real binary" }
+          Write-Output "staged probe-serve.exe ($size bytes)"
+
+      - name: Build the agent as a single file
+        # -H windowsgui: no console window. Safe now that every fatal path reports through a native
+        # message box (internal/ui/fatal.go) rather than a log line nobody would see, and that the
+        # log is teed to %LOCALAPPDATA%\Enteam\agent.log so a failed run can still be diagnosed
+        # after the fact. Without those two, this flag turns a startup failure into an executable
+        # that visibly does nothing at all.
+        working-directory: supervisor
+        run: go build -tags embedprobe -ldflags="-H windowsgui" -o ../dist/cp-agent.exe ./cmd/cp-agent
+
+      - name: Confirm the probe is actually inside the agent
+        shell: pwsh
+        run: |
+          $agent = (Get-Item dist/cp-agent.exe).Length
+          $probe = (Get-Item supervisor/internal/probeasset/probe-serve.exe).Length
+          if ($agent -le $probe) { throw "cp-agent.exe ($agent bytes) is not larger than the probe it should contain ($probe bytes)" }
+          Write-Output "cp-agent.exe: $agent bytes (probe: $probe bytes)"
+
+      # ---- signing --------------------------------------------------------------------------------
+      #
+      # Not armed. Until it is, the candidate gets SmartScreen's "Windows protected your PC" dialog,
+      # which offers only "Don't run" until they click through More info -> Run anyway. That is the
+      # single biggest obstacle to the one-click install, ahead of file count or runtime deps.
+      #
+      # Note before buying a certificate: a traditional EV cert on a physical USB token CANNOT be
+      # used here -- nothing can plug a token into a GitHub-hosted runner. It has to be a cloud
+      # signing service (Azure Trusted Signing, DigiCert KeyLocker, SSL.com eSigner), or the build
+      # has to move to a self-hosted runner.
+      #
+      # - name: Sign the agent
+      #   uses: azure/trusted-signing-action@v0
+      #   with:
+      #     endpoint: ${{ secrets.SIGNING_ENDPOINT }}
+      #     trusted-signing-account-name: ${{ secrets.SIGNING_ACCOUNT }}
+      #     certificate-profile-name: ${{ secrets.SIGNING_PROFILE }}
+      #     files-folder: dist
+      #     files-folder-filter: exe
+      #
+      # The probe is signed too, separately and before embedding -- probehost verifies its
+      # Authenticode signature before spawning it, and -expected-publisher arms that check. Signing
+      # only the outer agent would leave that verification permanently unarmed.
+
+      # ---- publish --------------------------------------------------------------------------------
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp-agent-windows-x64
+          path: dist/cp-agent.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish a release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/cp-agent.exe
+          generate_release_notes: true
+          body: |
+            One file. Download `cp-agent.exe` and run it.
+
+            It asks for consent before it does anything, shows you the identical feed your
+            interviewer sees for as long as it runs, and stops on one click.
+
+            Built from this commit by GitHub Actions: ${{ github.sha }}
+
+      # Worth adding once the repo is public, and cheap -- it is what lets anyone verify the exe
+      # they downloaded was built by this workflow from this commit, which a public repo on its own
+      # does not establish. Needs `id-token: write` and `attestations: write` on the job.
+      #
+      # - name: Attest build provenance
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-path: dist/cp-agent.exe

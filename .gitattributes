@@ -1,0 +1,18 @@
+# Line endings are not cosmetic in this repository.
+#
+# The local sink is byte-preserving on purpose (internal/sink) so the evidence chain built from
+# these messages downstream stays verifiable, and that chain hashes canonical bytes. Git's default
+# on Windows (core.autocrlf=true) rewrites LF to CRLF on checkout, which changes those bytes and
+# does so differently depending on who cloned the repo and on what OS.
+#
+# These are marked as non-text so git performs NO conversion in either direction: whatever bytes are
+# committed are the bytes on disk, on every machine. Deliberately a freeze rather than a
+# normalisation -- the fixtures already in this repository carry CRLF, and rewriting them to LF
+# would change the exact bytes the tests were verified against, which is the thing this file exists
+# to prevent.
+*.ndjson -text
+*.jsonl  -text
+
+# Not text at all.
+*.exe    binary
+*.png    binary

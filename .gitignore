@@ -1,0 +1,27 @@
+# --- rust ---
+target/
+
+# --- release output ---
+# What the workflow assembles and uploads: the single cp-agent.exe a candidate downloads.
+dist/
+
+# --- go ---
+# Scoped to the supervisor's own output directory, and anchored with a leading slash. A bare `bin/`
+# matches a directory of that name at ANY depth -- including probe-core/crates/cp-win/src/bin/,
+# which is where the Rust entry points live. That rule left probe_once.rs and probe_serve.rs
+# untracked in the repository this was split out of, so a fresh clone could not build the probes.
+/supervisor/bin/
+
+# --- session output ---
+# The agent's local NDJSON sink. Never commit a real session: it contains a real
+# machine's process list and window titles.
+*.jsonl
+session.jsonl
+
+# --- os / editors ---
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/
+*.user
+*.suo

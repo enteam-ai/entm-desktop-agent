@@ -1,0 +1,72 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Interview monitoring — your consent</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 32px 24px;
+    font: 14px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    background: Canvas; color: CanvasText;
+  }
+  h1 { font-size: 19px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: color-mix(in srgb, CanvasText 62%, Canvas); margin: 0 0 20px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .card { border: 1px solid color-mix(in srgb, CanvasText 16%, Canvas); border-radius: 8px; padding: 14px 16px; }
+  .card h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 9px; }
+  .reads h2 { color: #9a6b00; }
+  .never h2 { color: #1a7a4c; }
+  @media (prefers-color-scheme: dark) { .reads h2 { color: #e0b34d; } .never h2 { color: #5fd39b; } }
+  ul { margin: 0; padding-left: 17px; }
+  li { margin-bottom: 4px; }
+  .rights { border-left: 3px solid color-mix(in srgb, CanvasText 30%, Canvas); padding: 2px 0 2px 14px; margin: 0 0 20px; }
+  .rights p { margin: 0 0 7px; }
+  .rights p:last-child { margin-bottom: 0; }
+  strong { font-weight: 640; }
+  .actions { display: flex; gap: 10px; align-items: center; }
+  button { font: inherit; padding: 9px 18px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .primary { background: #0b5cd5; color: #fff; font-weight: 600; }
+  .primary:hover { background: #0a4fb5; }
+  .secondary { background: transparent; color: CanvasText; border-color: color-mix(in srgb, CanvasText 32%, Canvas); }
+  .secondary:hover { background: color-mix(in srgb, CanvasText 8%, Canvas); }
+  .note { margin-left: auto; font-size: 12px; color: color-mix(in srgb, CanvasText 55%, Canvas); }
+</style>
+
+<h1>This interview uses monitoring software</h1>
+<p class="sub">Please read this before you agree. Nothing is recorded or sent until you do.</p>
+
+<div class="cols">
+  <div class="card reads">
+    <h2>What it reads</h2>
+    <ul>
+      <li>Which applications are running</li>
+      <li>Which application is using your <strong>microphone</strong></li>
+      <li>The <strong>title</strong> of your active window</li>
+      <li>Which windows are set to hide from screen sharing</li>
+    </ul>
+  </div>
+  <div class="card never">
+    <h2>What it never reads</h2>
+    <ul>
+      <li>Anything you type</li>
+      <li>What is <em>inside</em> your windows</li>
+      <li>Your screen, camera, or audio</li>
+      <li>Your files, clipboard, or browsing history</li>
+    </ul>
+  </div>
+</div>
+
+<div class="rights">
+  <p><strong>You see exactly what your interviewer sees.</strong> A window stays open showing the
+     live feed as it is sent. If it is not in that window, it is not being sent.</p>
+  <p><strong>You can stop at any time, with one click.</strong> Monitoring ends immediately and your
+     interviewer is told that it stopped.</p>
+  <p><strong>You can decline.</strong> The interview goes ahead either way. Your interviewer is
+     simply told that monitoring was declined.</p>
+</div>
+
+<div class="actions">
+  <button class="primary" onclick="window.accept()">I agree — start monitoring</button>
+  <button class="secondary" onclick="window.decline()">Decline</button>
+  <span class="note">Ends when the interview ends.</span>
+</div>
